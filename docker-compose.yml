@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: medisync
+      POSTGRES_USER: medisync
+      POSTGRES_PASSWORD: medisync_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://medisync:medisync_dev@db:5432/medisync
+      API_KEY: dev-api-key-change-in-prod
+      STORAGE_PATH: /app/storage/documents
+    volumes:
+      - ./storage/documents:/app/storage/documents
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

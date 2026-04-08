@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediSync Dashboard</title>
+<style>
+  :root {
+    --primary: #8b1a2b;
+    --primary-light: #a82d40;
+    --bg: #f5f6fa;
+    --card: #ffffff;
+    --text: #2d3436;
+    --text-muted: #636e72;
+    --border: #e0e0e0;
+    --accent: #0984e3;
+    --success: #00b894;
+    --warning: #fdcb6e;
+    --danger: #d63031;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  header {
+    background: var(--primary);
+    color: white;
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 { font-size: 1.4rem; font-weight: 600; }
+  header .subtitle { font-size: 0.85rem; opacity: 0.8; }
+
+  .stats-bar {
+    display: flex;
+    gap: 16px;
+    padding: 20px 32px;
+    background: white;
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-card {
+    flex: 1;
+    padding: 16px 20px;
+    background: var(--bg);
+    border-radius: 10px;
+    text-align: center;
+  }
+  .stat-card .num {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+  }
+  .stat-card .label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .breadcrumb {
+    padding: 12px 32px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background: white;
+    border-bottom: 1px solid var(--border);
+  }
+  .breadcrumb span { cursor: pointer; color: var(--accent); }
+  .breadcrumb span:hover { text-decoration: underline; }
+  .breadcrumb .sep { color: var(--text-muted); margin: 0 6px; cursor: default; }
+  .breadcrumb .current { color: var(--text); font-weight: 600; cursor: default; }
+
+  .container { padding: 24px 32px; }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .icon { font-size: 1.3rem; }
+  .section-title .count {
+    background: var(--primary);
+    color: white;
+    font-size: 0.75rem;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: var(--shadow);
+  }
+  .card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 16px rgba(139,26,43,0.12);
+    transform: translateY(-1px);
+  }
+
+  .card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .card .card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .card .card-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-active { background: #dff9f0; color: #00b894; }
+  .badge-pending { background: #ffeaa7; color: #996515; }
+  .badge-complete { background: #dfe6e9; color: #636e72; }
+
+  .card .fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 16px;
+    font-size: 0.85rem;
+  }
+  .card .field-label { color: var(--text-muted); }
+  .card .field-value { font-weight: 500; }
+
+  .detail-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+  }
+  .detail-panel h2 {
+    font-size: 1.3rem;
+    margin-bottom: 4px;
+  }
+  .detail-panel .sub { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px 24px;
+    font-size: 0.9rem;
+  }
+  .detail-grid dt { color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.3px; }
+  .detail-grid dd { font-weight: 500; margin-bottom: 8px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--bg);
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border);
+  }
+  table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  table tr:hover td { background: #f8f9fa; }
+  table tr { cursor: pointer; }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .status-dot.green { background: var(--success); }
+  .status-dot.yellow { background: var(--warning); }
+  .status-dot.red { background: var(--danger); }
+  .status-dot.gray { background: #b2bec3; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+  }
+
+  .back-btn {
+    background: none;
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .back-btn:hover { background: var(--bg); }
+
+  .btn-extract {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 16px;
+  }
+  .btn-extract:hover { background: #0770c2; }
+  .btn-extract:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .btn-md {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-left: 8px;
+  }
+  .btn-md:hover { background: var(--primary-light); }
+
+  .extraction-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .extraction-card .ext-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .extraction-card pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  .extraction-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+  }
+  .extraction-tabs button {
+    padding: 8px 20px;
+    border: none;
+    background: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+  }
+  .extraction-tabs button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  .md-content {
+    background: var(--bg);
+    padding: 20px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  .md-content h1 { font-size: 1.3rem; color: var(--primary); margin-bottom: 8px; }
+  .md-content h2 { font-size: 1.1rem; margin: 16px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .md-content h3 { font-size: 0.95rem; margin: 12px 0 6px; color: var(--accent); }
+  .md-content ul { margin: 4px 0 4px 20px; }
+  .md-content li { margin: 2px 0; }
+  .doc-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+  }
+  .doc-modal {
+    width: min(980px, 96vw);
+    height: min(86vh, 860px);
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .doc-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .doc-modal-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .doc-modal-close {
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  .doc-modal-close:hover { background: var(--bg); }
+  .doc-modal-body { flex: 1; padding: 12px; }
+  .doc-modal-frame {
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  @media (max-width: 768px) {
+    .stats-bar { flex-direction: column; }
+    .grid { grid-template-columns: 1fr; }
+    .container { padding: 16px; }
+    header { padding: 12px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>MediSync Dashboard</h1>
+    <div class="subtitle" id="agencyName">Healthcare Data Pipeline</div>
+  </div>
+  <div style="font-size: 0.85rem; opacity: 0.8;" id="lastSync"></div>
+</header>
+
+<div class="stats-bar" id="statsBar">
+  <div class="stat-card"><div class="num" id="statPatients">--</div><div class="label">Patients</div></div>
+  <div class="stat-card"><div class="num" id="statEpisodes">--</div><div class="label">Episodes</div></div>
+  <div class="stat-card"><div class="num" id="statOrders">--</div><div class="label">Orders</div></div>
+  <div class="stat-card"><div class="num" id="statDocuments">--</div><div class="label">Documents</div></div>
+  <div class="stat-card"><div class="num" id="statSyncRuns">--</div><div class="label">Sync Runs</div></div>
+</div>
+
+<div class="breadcrumb" id="breadcrumb">
+  <span class="current">Home Health</span>
+</div>
+
+<div class="container" id="content">
+  <div class="loading">Loading...</div>
+</div>
+
+<div class="doc-modal-overlay" id="docModalOverlay" onclick="hideDocumentModal()">
+  <div class="doc-modal" onclick="event.stopPropagation()">
+    <div class="doc-modal-header">
+      <div class="doc-modal-title" id="docModalTitle">Document Preview</div>
+      <button class="doc-modal-close" onclick="hideDocumentModal()">Close</button>
+    </div>
+    <div class="doc-modal-body" id="docModalBody"></div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '/api/v1';
+const API_KEY = 'dev-api-key-change-in-prod';
+
+const headers = { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' };
+
+async function apiFetch(path) {
+  const res = await fetch(API_BASE + path, { headers });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+function formatDate(iso) {
+  if (!iso) return '--';
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '--';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+    + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(text) {
+  if (!text) return '--';
+  const el = document.createElement('span');
+  el.textContent = text;
+  return el.innerHTML;
+}
+
+function statusDotClass(status) {
+  if (!status) return 'gray';
+  const s = status.toLowerCase();
+  if (s.includes('completed') || s.includes('returned')) return 'green';
+  if (s.includes('pending') || s.includes('submitted')) return 'yellow';
+  if (s.includes('not yet')) return 'gray';
+  if (s.includes('fail') || s.includes('error')) return 'red';
+  return 'gray';
+}
+
+function attachDocumentsToOrders(orders, documents) {
+  const docsByOrder = new Map();
+  for (const doc of (documents || [])) {
+    const key = doc.order_id;
+    const list = docsByOrder.get(key) || [];
+    list.push(doc);
+    docsByOrder.set(key, list);
+  }
+  return orders.map((order) => ({
+    ...order,
+    documents: docsByOrder.get(order.order_id) || [],
+  }));
+}
+
+async function openDocument(documentId) {
+  const overlay = document.getElementById('docModalOverlay');
+  const body = document.getElementById('docModalBody');
+  const title = document.getElementById('docModalTitle');
+
+  if (overlay) overlay.style.display = 'flex';
+  if (body) body.innerHTML = '<div class="loading">Loading document...</div>';
+  if (title) title.textContent = `Document #${documentId}`;
+
+  try {
+    const res = await fetch(`${API_BASE}/documents/${documentId}/file`, {
+      headers: { 'X-API-KEY': API_KEY },
+    });
+    if (!res.ok) throw new Error(`Failed to open document (${res.status})`);
+
+    const filenameHeader = res.headers.get('content-disposition');
+    if (title && filenameHeader) {
+      const match = filenameHeader.match(/filename\\*?=(?:UTF-8''|\"?)([^\";]+)/i);
+      if (match && match[1]) {
+        title.textContent = decodeURIComponent(match[1].replace(/\"/g, ''));
+      }
+    }
+
+    if (currentDocumentUrl) {
+      URL.revokeObjectURL(currentDocumentUrl);
+      currentDocumentUrl = null;
+    }
+
+    const blob = await res.blob();
+    const fileUrl = URL.createObjectURL(blob);
+    currentDocumentUrl = fileUrl;
+    if (body) {
+      body.innerHTML = `<iframe class="doc-modal-frame" src="${fileUrl}" title="Document Preview"></iframe>`;
+    }
+  } catch (e) {
+    if (body) body.innerHTML = `<div class="empty-state"><p>Could not open document: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+// --- State ---
+let allPatients = [];
+let currentView = 'patients'; // patients | patient-detail | episode-orders
+let currentDocumentUrl = null;
+
+function hideDocumentModal() {
+  const overlay = document.getElementById('docModalOverlay');
+  const body = document.getElementById('docModalBody');
+  if (overlay) overlay.style.display = 'none';
+  if (body) body.innerHTML = '';
+  if (currentDocumentUrl) {
+    URL.revokeObjectURL(currentDocumentUrl);
+    currentDocumentUrl = null;
+  }
+}
+
+// --- Stats ---
+async function loadStats() {
+  try {
+    const metrics = await apiFetch('/sync/metrics');
+    document.getElementById('statSyncRuns').textContent = metrics.total_runs || 0;
+    document.getElementById('statDocuments').textContent = metrics.total_documents || 0;
+    if (metrics.recent_runs && metrics.recent_runs.length > 0) {
+      const last = metrics.recent_runs[0];
+      document.getElementById('lastSync').textContent =
+        'Last sync: ' + formatDateTime(last.completed_at || last.started_at);
+    }
+  } catch (e) {
+    console.warn('Could not load metrics', e);
+  }
+}
+
+// --- Patient List View ---
+async function showPatientList() {
+  currentView = 'patients';
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="loading">Loading patients...</div>';
+  setBreadcrumb([{ label: 'Home Health', action: null }]);
+
+  try {
+    allPatients = await apiFetch('/patients/overview?limit=500&offset=0');
+    document.getElementById('statPatients').textContent = allPatients.length;
+
+    const totalEpisodes = allPatients.reduce((sum, p) => sum + (p.episode_count || 0), 0);
+    const totalOrders = allPatients.reduce((sum, p) => sum + (p.order_count || 0), 0);
+    const totalDocuments = allPatients.reduce((sum, p) => sum + (p.document_count || 0), 0);
+
+    if (allPatients.length === 0) {
+      content.innerHTML = `<div class="empty-state">
+        <div class="icon">&#128203;</div>
+        <p>No patients found yet.</p>
+        <p style="font-size:0.85rem; margin-top:8px;">Run the MediSync RPA to extract patient data.</p>
+      </div>`;
+      return;
+    }
+
+    let html = `<div class="section-title">
+      <span class="icon">&#128100;</span> Patients
+      <span class="count">${allPatients.length}</span>
+    </div><div class="grid">`;
+
+    for (const p of allPatients) {
+      html += `<div class="card" onclick="showPatientDetail('${escapeHtml(p.mrn)}')">
+        <div class="card-header">
+          <div>
+            <div class="card-title">${escapeHtml(p.last_name)}, ${escapeHtml(p.first_name)}</div>
+            <div class="card-subtitle">MRN: ${escapeHtml(p.mrn)}</div>
+          </div>
+          <span class="badge badge-active">${p.episode_count || 0} ep &middot; ${p.order_count || 0} ord &middot; ${p.document_count || 0} doc</span>
+        </div>
+        <div class="fields">
+          <span class="field-label">DOB</span><span class="field-value">${formatDate(p.dob)}</span>
+          <span class="field-label">Phone</span><span class="field-value">${escapeHtml(p.phone)}</span>
+          <span class="field-label">Created</span><span class="field-value">${formatDateTime(p.created_at)}</span>
+          <span class="field-label">Updated</span><span class="field-value">${formatDateTime(p.updated_at)}</span>
+        </div>
+      </div>`;
+    }
+
+    html += '</div>';
+    content.innerHTML = html;
+
+    document.getElementById('statEpisodes').textContent = totalEpisodes;
+    document.getElementById('statOrders').textContent = totalOrders;
+    document.getElementById('statDocuments').textContent = totalDocuments;
+
+  } catch (e) {
+    content.innerHTML = `<div class="empty-state"><p>Error loading patients: ${e.message}</p></div>`;
+  }
+}
+
+// --- Patient Detail View ---
+async function showPatientDetail(mrn) {
+  currentView = 'patient-detail';
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="loading">Loading patient...</div>';
+
+  setBreadcrumb([
+    { label: 'Home Health', action: () => showPatientList() },
+    { label: mrn, action: null },
+  ]);
+
+  try {
+    const [patient, episodes, orders, patientDocuments] = await Promise.all([
+      apiFetch(`/patients/${encodeURIComponent(mrn)}`),
+      apiFetch(`/episodes?mrn=${encodeURIComponent(mrn)}`),
+      apiFetch(`/orders?mrn=${encodeURIComponent(mrn)}`),
+      apiFetch(`/documents/by-mrn?mrn=${encodeURIComponent(mrn)}`),
+    ]);
+    const enrichedOrders = attachDocumentsToOrders(orders, patientDocuments);
+
+    const p = patient.profile_data || {};
+    let html = `<div class="detail-panel">
+      <h2>${escapeHtml(patient.last_name)}, ${escapeHtml(patient.first_name)}</h2>
+      <div class="sub">MRN: ${escapeHtml(patient.mrn)}</div>
+
+      <h3 style="font-size:0.95rem;color:var(--text-muted);margin:14px 0 6px;">Demographics</h3>
+      <div class="detail-grid">
+        <div><dt>Date of Birth</dt><dd>${formatDate(patient.dob)}</dd></div>
+        <div><dt>Phone</dt><dd>${escapeHtml(patient.phone)}</dd></div>
+        <div><dt>Alternate Phone</dt><dd>${escapeHtml(p.alternate_phone)}</dd></div>
+        <div><dt>Sex</dt><dd>${escapeHtml(p.sex)}</dd></div>
+        <div><dt>Race</dt><dd>${escapeHtml(p.race)}</dd></div>
+        <div><dt>Ethnicity</dt><dd>${escapeHtml(p.ethnicity)}</dd></div>
+        <div><dt>Marital Status</dt><dd>${escapeHtml(p.marital_status)}</dd></div>
+        <div><dt>Primary Language</dt><dd>${escapeHtml(p.primary_language)}</dd></div>
+        <div><dt>Interpreter</dt><dd>${escapeHtml(p.interpreter)}</dd></div>
+        <div><dt>Service Location</dt><dd>${escapeHtml(p.service_location)}</dd></div>
+        <div><dt>Auxiliary Aids</dt><dd>${escapeHtml(p.auxiliary_aids)}</dd></div>
+        <div><dt>Email</dt><dd>${escapeHtml(p.email)}</dd></div>
+        <div><dt>SSN</dt><dd>${escapeHtml(p.ssn)}</dd></div>
+      </div>
+
+      <h3 style="font-size:0.95rem;color:var(--text-muted);margin:14px 0 6px;">Address</h3>
+      <div class="detail-grid">
+        <div><dt>Primary Address</dt><dd>${escapeHtml(p.primary_address)}</dd></div>
+        <div><dt>Mailing Address</dt><dd>${escapeHtml(p.mailing_address)}</dd></div>
+      </div>
+    </div>
+
+    <div class="detail-panel" style="margin-top: 16px;">
+      <h2 style="font-size: 1.1rem;">Insurance &amp; Payer</h2>
+      <div class="detail-grid">
+        <div><dt>Primary Insurance</dt><dd>${escapeHtml(p.primary_insurance)}</dd></div>
+        <div><dt>MBI Number</dt><dd>${escapeHtml(p.mbi_number)}</dd></div>
+        <div><dt>Secondary Insurance</dt><dd>${escapeHtml(p.secondary_insurance)}</dd></div>
+        <div><dt>Medicare Part A Effective</dt><dd>${formatDate(p.medicare_part_a_effective)}</dd></div>
+        <div><dt>Medicare Part B Effective</dt><dd>${formatDate(p.medicare_part_b_effective)}</dd></div>
+        <div><dt>Advanced Directive Comments</dt><dd>${escapeHtml(p.advanced_directive_comments)}</dd></div>
+        <div><dt>Pharmacy</dt><dd>${escapeHtml(p.pharmacy_name)}</dd></div>
+        <div><dt>Allergies</dt><dd>${escapeHtml(p.allergies)}</dd></div>
+      </div>
+    </div>
+
+    <div class="detail-panel" style="margin-top: 16px;">
+      <h2 style="font-size: 1.1rem;">Clinical</h2>
+      <div class="detail-grid">
+        <div><dt>Primary Diagnosis</dt><dd>${escapeHtml(p.primary_diagnosis)}</dd></div>
+        <div><dt>Additional Diagnoses</dt><dd>${escapeHtml(p.additional_diagnoses)}</dd></div>
+        <div><dt>Services Required</dt><dd>${escapeHtml(p.services_required)}</dd></div>
+        <div><dt>Case Manager</dt><dd>${escapeHtml(p.case_manager)}</dd></div>
+        <div><dt>Clinical Manager</dt><dd>${escapeHtml(p.clinical_manager)}</dd></div>
+        <div><dt>Primary Clinician</dt><dd>${escapeHtml(p.primary_clinician)}</dd></div>
+      </div>
+    </div>
+
+    <div class="detail-panel" style="margin-top: 16px;">
+      <h2 style="font-size: 1.1rem;">Physicians</h2>
+      <div class="detail-grid">
+        <div><dt>Attending</dt><dd>${escapeHtml(p.attending_physician)}</dd></div>
+        <div><dt>Attending NPI</dt><dd>${escapeHtml(p.attending_npi)}</dd></div>
+        <div><dt>Referring</dt><dd>${escapeHtml(p.referring_physician)}</dd></div>
+        <div><dt>Referring NPI</dt><dd>${escapeHtml(p.referring_npi)}</dd></div>
+        <div><dt>Certifying</dt><dd>${escapeHtml(p.certifying_physician)}</dd></div>
+        <div><dt>Certifying NPI</dt><dd>${escapeHtml(p.certifying_npi)}</dd></div>
+      </div>
+    </div>
+
+    <div class="detail-panel" style="margin-top: 16px;">
+      <h2 style="font-size: 1.1rem;">Emergency Contact &amp; Referral</h2>
+      <div class="detail-grid">
+        <div><dt>Emergency Contact</dt><dd>${escapeHtml(p.emergency_contact_name)}</dd></div>
+        <div><dt>Relationship</dt><dd>${escapeHtml(p.emergency_contact_relationship)}</dd></div>
+        <div><dt>Contact Phone</dt><dd>${escapeHtml(p.emergency_contact_phone)}</dd></div>
+        <div><dt>Referral Date</dt><dd>${formatDate(p.referral_date)}</dd></div>
+        <div><dt>Admission Source</dt><dd>${escapeHtml(p.admission_source)}</dd></div>
+        <div><dt>Community Liaison</dt><dd>${escapeHtml(p.community_liaison)}</dd></div>
+        <div><dt>Facility Referral Source</dt><dd>${escapeHtml(p.facility_referral_source)}</dd></div>
+        <div><dt>Face-to-Face Date</dt><dd>${formatDate(p.face_to_face_date)}</dd></div>
+        <div><dt>Priority (Visit Type)</dt><dd>${escapeHtml(p.priority_visit_type)}</dd></div>
+        <div><dt>Emergency Triage Level</dt><dd>${p.emergency_triage_level != null ? p.emergency_triage_level : '--'}</dd></div>
+        <div><dt>Record Created</dt><dd>${formatDateTime(patient.created_at)}</dd></div>
+        <div><dt>Last Updated</dt><dd>${formatDateTime(patient.updated_at)}</dd></div>
+      </div>
+    </div>`;
+
+    // --- Document Extraction section ---
+    html += `<div class="detail-panel" style="margin-top: 16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+        <h2 style="font-size: 1.1rem;">Document Intelligence</h2>
+        <button class="btn-extract" id="btnExtract" onclick="triggerExtraction('${escapeHtml(mrn)}')">
+          &#9889; Run Patient Info Extraction
+        </button>
+      </div>
+      <div id="extractionStatus"></div>
+      <div id="extractionResults"></div>
+    </div>`;
+
+    // Episodes
+    html += `<div class="section-title">
+      <span class="icon">&#128197;</span> Episodes
+      <span class="count">${episodes.length}</span>
+    </div>`;
+
+    if (episodes.length === 0) {
+      html += '<p style="color: var(--text-muted); margin-bottom:24px;">No episodes found.</p>';
+    } else {
+      html += '<div class="grid" style="margin-bottom: 24px;">';
+      episodes.sort((a, b) => (a.start_date > b.start_date ? -1 : 1));
+      for (const ep of episodes) {
+        const epOrders = enrichedOrders.filter(o => o.episode_id === ep.id);
+        html += `<div class="card" onclick="showEpisodeOrders('${escapeHtml(mrn)}', ${ep.id})">
+          <div class="card-header">
+            <div>
+              <div class="card-title">${formatDate(ep.start_date)} &mdash; ${formatDate(ep.end_date)}</div>
+              <div class="card-subtitle">SOC: ${formatDate(ep.soc_date)}</div>
+            </div>
+            <span class="badge ${ep.status === 'active' ? 'badge-active' : 'badge-complete'}">${escapeHtml(ep.status)}</span>
+          </div>
+          <div class="fields">
+            <span class="field-label">Orders</span><span class="field-value">${epOrders.length}</span>
+            <span class="field-label">Episode ID</span><span class="field-value">${ep.id}</span>
+          </div>
+        </div>`;
+      }
+      html += '</div>';
+    }
+
+    // Unlinked orders (episode_id is null)
+    const unlinked = enrichedOrders.filter(o => !o.episode_id);
+    if (unlinked.length > 0) {
+      html += `<div class="section-title">
+        <span class="icon">&#128196;</span> Unlinked Orders
+        <span class="count">${unlinked.length}</span>
+      </div>`;
+      html += buildOrdersTable(unlinked);
+    }
+
+    html += `<div class="section-title">
+      <span class="icon">&#128206;</span> Patient Documents
+      <span class="count">${patientDocuments.length}</span>
+    </div>`;
+
+    if (patientDocuments.length === 0) {
+      html += '<p style="color: var(--text-muted); margin-bottom:24px;">No documents found for this patient.</p>';
+    } else {
+      html += buildPatientDocumentsTable(patientDocuments);
+    }
+
+    content.innerHTML = html;
+    loadExtractions(mrn);
+
+  } catch (e) {
+    content.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+// --- Episode Orders View ---
+async function showEpisodeOrders(mrn, episodeId) {
+  currentView = 'episode-orders';
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="loading">Loading orders...</div>';
+
+  setBreadcrumb([
+    { label: 'Home Health', action: () => showPatientList() },
+    { label: mrn, action: () => showPatientDetail(mrn) },
+    { label: `Episode #${episodeId}`, action: null },
+  ]);
+
+  try {
+    const [orders, patientDocuments, episodes] = await Promise.all([
+      apiFetch(`/orders?mrn=${encodeURIComponent(mrn)}`),
+      apiFetch(`/documents/by-mrn?mrn=${encodeURIComponent(mrn)}`),
+      apiFetch(`/episodes?mrn=${encodeURIComponent(mrn)}`),
+    ]);
+    const enrichedOrders = attachDocumentsToOrders(orders, patientDocuments);
+    const episode = episodes.find(e => e.id === episodeId);
+    const epOrders = enrichedOrders.filter(o => o.episode_id === episodeId);
+
+    let html = '';
+    if (episode) {
+      html += `<div class="detail-panel">
+        <h2>Episode: ${formatDate(episode.start_date)} &mdash; ${formatDate(episode.end_date)}</h2>
+        <div class="sub">Patient MRN: ${escapeHtml(mrn)}</div>
+        <div class="detail-grid">
+          <div><dt>Start of Care</dt><dd>${formatDate(episode.soc_date)}</dd></div>
+          <div><dt>Status</dt><dd>${escapeHtml(episode.status)}</dd></div>
+          <div><dt>Episode ID</dt><dd>${episode.id}</dd></div>
+          <div><dt>Patient ID</dt><dd>${episode.patient_id}</dd></div>
+        </div>
+      </div>`;
+    }
+
+    html += `<div class="section-title">
+      <span class="icon">&#128196;</span> Orders
+      <span class="count">${epOrders.length}</span>
+    </div>`;
+
+    if (epOrders.length === 0) {
+      html += '<p style="color: var(--text-muted);">No orders linked to this episode.</p>';
+    } else {
+      html += buildOrdersTable(epOrders);
+    }
+
+    content.innerHTML = html;
+
+  } catch (e) {
+    content.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+function buildOrdersTable(orders) {
+  let html = `<div style="overflow-x: auto;"><table>
+    <thead><tr>
+      <th>Order ID</th><th>Type</th><th>Date</th><th>Status</th><th>Documents</th><th>Created</th>
+    </tr></thead><tbody>`;
+
+  for (const o of orders) {
+    const dotClass = statusDotClass(o.status);
+    const docs = o.documents || [];
+    const docCount = docs.length;
+    const docNames = docs.map(d => d.filename).filter(Boolean).join(', ');
+    const docLinks = docs
+      .map((d) =>
+        `<a href="#" onclick="openDocument(${d.id}); return false;" title="${escapeHtml(d.filename || 'Open document')}">View</a>`
+      )
+      .join('<br>');
+    html += `<tr onclick="event.stopPropagation()">
+      <td style="font-weight:500; font-size: 0.82rem; max-width: 220px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(o.order_id)}">${escapeHtml(o.order_id)}</td>
+      <td>${escapeHtml(o.doc_type)}</td>
+      <td>${formatDate(o.order_date)}</td>
+      <td><span class="status-dot ${dotClass}"></span>${escapeHtml(o.status)}</td>
+      <td title="${escapeHtml(docNames || 'No documents')}">${docCount > 0 ? `${docCount} file(s)<div style="margin-top:6px; font-size: 0.78rem; line-height: 1.4;">${docLinks}</div>` : '--'}</td>
+      <td>${formatDateTime(o.created_at)}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function buildPatientDocumentsTable(documents) {
+  let html = `<div style="overflow-x: auto;"><table>
+    <thead><tr>
+      <th>Document</th><th>Order ID</th><th>Type</th><th>Status</th><th>Order Date</th><th>Uploaded</th>
+    </tr></thead><tbody>`;
+
+  for (const d of documents) {
+    const dotClass = statusDotClass(d.status);
+    html += `<tr onclick="event.stopPropagation()">
+      <td><a href="#" onclick="openDocument(${d.id}); return false;" title="${escapeHtml(d.filename || 'Open document')}">View</a></td>
+      <td>${escapeHtml(d.order_id)}</td>
+      <td>${escapeHtml(d.doc_type)}</td>
+      <td><span class="status-dot ${dotClass}"></span>${escapeHtml(d.status)}</td>
+      <td>${formatDate(d.order_date)}</td>
+      <td>${formatDateTime(d.created_at)}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table></div>';
+  return html;
+}
+
+// --- Breadcrumb ---
+function setBreadcrumb(items) {
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = '';
+  items.forEach((item, i) => {
+    const isLast = i === items.length - 1;
+    if (i > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'sep';
+      sep.textContent = '>';
+      bc.appendChild(sep);
+    }
+    const el = document.createElement('span');
+    el.textContent = item.label;
+    if (isLast) {
+      el.className = 'current';
+    } else if (item.action) {
+      el.onclick = item.action;
+    }
+    bc.appendChild(el);
+  });
+}
+
+// --- Document Extraction ---
+async function triggerExtraction(mrn) {
+  const btn = document.getElementById('btnExtract');
+  const statusEl = document.getElementById('extractionStatus');
+  if (btn) btn.disabled = true;
+  if (btn) btn.innerHTML = '&#9889; Extracting...';
+  if (statusEl) statusEl.innerHTML = '<div class="loading">Running extraction (reading PDFs + LLM analysis)... This may take a minute.</div>';
+
+  try {
+    const res = await fetch(`${API_BASE}/extractions/${encodeURIComponent(mrn)}`, {
+      method: 'POST',
+      headers,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+
+    if (data.status === 'failed') {
+      statusEl.innerHTML = `<div style="color:var(--danger);padding:12px;">${escapeHtml(data.message)}</div>`;
+    } else {
+      statusEl.innerHTML = `<div style="color:var(--success);padding:12px;">${escapeHtml(data.message)}</div>`;
+    }
+    loadExtractions(mrn);
+  } catch (e) {
+    statusEl.innerHTML = `<div style="color:var(--danger);padding:12px;">Extraction failed: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '&#9889; Run Patient Info Extraction'; }
+  }
+}
+
+async function loadExtractions(mrn) {
+  const container = document.getElementById('extractionResults');
+  if (!container) return;
+
+  try {
+    const extractions = await apiFetch(`/extractions/${encodeURIComponent(mrn)}`);
+    if (!extractions || extractions.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">No extractions yet. Click the button above to analyze this patient\'s documents.</p>';
+      return;
+    }
+
+    let html = '';
+    for (const ext of extractions) {
+      const tabId = `ext_${ext.id}`;
+      const statusBadge = ext.status === 'completed'
+        ? '<span class="badge badge-active">Completed</span>'
+        : ext.status === 'failed'
+          ? '<span class="badge" style="background:#ffeaea;color:var(--danger);">Failed</span>'
+          : '<span class="badge badge-pending">Processing</span>';
+
+      html += `<div class="extraction-card">
+        <div class="ext-header">
+          <div>
+            <strong>Extraction #${ext.id}</strong>
+            &nbsp;${statusBadge}
+            <span style="color:var(--text-muted);font-size:0.8rem;margin-left:8px;">
+              ${formatDateTime(ext.created_at)} &middot; ${ext.documents_processed} docs &middot; ${escapeHtml(ext.model_name || '')}
+            </span>
+          </div>
+          <div>
+            ${ext.markdown ? `<button class="btn-md" onclick="downloadMarkdown(${ext.id})">&#128196; Download MD</button>` : ''}
+          </div>
+        </div>`;
+
+      if (ext.status === 'failed') {
+        html += `<div style="color:var(--danger);font-size:0.85rem;">${escapeHtml(ext.error_message)}</div>`;
+      } else if (ext.structured_data || ext.markdown) {
+        html += `<div class="extraction-tabs" id="tabs_${tabId}">
+          ${ext.markdown ? `<button class="active" onclick="showExtTab('${tabId}','md')">Summary</button>` : ''}
+          ${ext.structured_data ? `<button onclick="showExtTab('${tabId}','json')">JSON Data</button>` : ''}
+        </div>`;
+        if (ext.markdown) {
+          html += `<div id="${tabId}_md" class="md-content">${renderMarkdown(ext.markdown)}</div>`;
+        }
+        if (ext.structured_data) {
+          const display = ext.markdown ? 'none' : 'block';
+          html += `<div id="${tabId}_json" style="display:${display};"><pre>${escapeHtml(JSON.stringify(ext.structured_data, null, 2))}</pre></div>`;
+        }
+      }
+      html += '</div>';
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    console.warn('Could not load extractions', e);
+  }
+}
+
+function showExtTab(tabId, which) {
+  const tabs = document.getElementById('tabs_' + tabId);
+  if (tabs) {
+    tabs.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    const btnIdx = which === 'md' ? 0 : 1;
+    if (tabs.children[btnIdx]) tabs.children[btnIdx].classList.add('active');
+  }
+  const mdEl = document.getElementById(tabId + '_md');
+  const jsonEl = document.getElementById(tabId + '_json');
+  if (mdEl) mdEl.style.display = which === 'md' ? 'block' : 'none';
+  if (jsonEl) jsonEl.style.display = which === 'json' ? 'block' : 'none';
+}
+
+function renderMarkdown(md) {
+  if (!md) return '';
+  let html = escapeHtml(md);
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+  html = html.replace(/\n\n/g, '<br><br>');
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+async function downloadMarkdown(extractionId) {
+  try {
+    const res = await fetch(`${API_BASE}/extractions/detail/${extractionId}/markdown`, {
+      headers: { 'X-API-KEY': API_KEY },
+    });
+    if (!res.ok) throw new Error(`Failed (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `extraction_${extractionId}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Could not download: ' + e.message);
+  }
+}
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') hideDocumentModal();
+  });
+  loadStats();
+  showPatientList();
+});
+</script>
+</body>
+</html>
