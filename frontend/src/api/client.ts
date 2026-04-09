@@ -15,6 +15,21 @@ export async function apiGet<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+export async function apiPost<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "X-API-KEY": API_KEY,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+
+  return (await response.json()) as T;
+}
+
 export async function fetchDocumentBlob(documentId: number): Promise<Blob> {
   const response = await fetch(`${API_BASE}/documents/${documentId}/file`, {
     headers: {

@@ -78,6 +78,11 @@ class MediSyncClient:
     def upsert_patient(self, patient_data: dict) -> dict:
         return self._post("/patients", patient_data)
 
+    # -- Admission --
+
+    def upsert_admission(self, admission_data: dict) -> dict:
+        return self._post("/admissions", admission_data)
+
     # -- Episode --
 
     def upsert_episode(self, episode_data: dict) -> dict:

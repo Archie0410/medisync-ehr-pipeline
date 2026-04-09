@@ -21,4 +21,5 @@ class Patient(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    admissions = relationship("Admission", back_populates="patient", cascade="all, delete-orphan")
     episodes = relationship("Episode", back_populates="patient", cascade="all, delete-orphan")

@@ -35,9 +35,11 @@ export function OrdersTable({ orders, documents, onViewDocument }: Props) {
             const linkedDocs = docsByOrder[order.order_id] ?? [];
             return (
               <tr key={order.id}>
-                <td>{order.order_id}</td>
+                <td className="order-id-cell">{order.order_id}</td>
                 <td>{order.doc_type ?? "--"}</td>
-                <td>{order.status ?? "--"}</td>
+                <td>
+                  <span className="table-status">{order.status ?? "--"}</span>
+                </td>
                 <td>
                   {linkedDocs.length === 0 ? (
                     "--"

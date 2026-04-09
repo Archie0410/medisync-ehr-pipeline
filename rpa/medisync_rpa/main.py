@@ -9,8 +9,8 @@ End-to-end per-patient pipeline:
      b. Change date filter to "All"
      c. Scrape Schedule Activity table (orders)
      d. Download documents via the Actions column
-  5. Push to backend: patient, episodes (computed from SOC + current episode),
-     orders (from schedule activities, assigned to correct episode), documents
+  5. Push to backend: patient, admissions, episodes (scoped per admission),
+     orders (from schedule activities, assigned to admission-scoped episode), documents
   6. Complete sync run
 
 RPA is stateless -- all persistent data lives in the backend.
@@ -141,6 +141,8 @@ def _push_patient_data(
             "referral_date", "admission_source", "community_liaison",
             "facility_referral_source", "face_to_face_date",
             "priority_visit_type", "emergency_triage_level",
+            # Admission Periods
+            "admission_periods",
         ]
         profile_blob = {k: profile.get(k) for k in _blob_keys if profile.get(k) is not None}
 
@@ -162,44 +164,57 @@ def _push_patient_data(
         error_details[f"patient:{sidebar_name}"] = str(e)
         return
 
-    # -- Compute and upsert all episodes --
+    # -- Upsert admissions, then compute and upsert episodes per admission --
     episode_info = profile.get("episode") or {}
     current_start = episode_info.get("start_date")
     current_end = episode_info.get("end_date")
     soc_date = episode_info.get("soc_date")
     npi = profile.get("attending_npi")
+    admission_periods = normalize_admission_periods(profile.get("admission_periods"), current_start, current_end)
+
+    admission_id_map: dict[tuple[str, str | None], int] = {}
+    for adm in admission_periods:
+        adm_start = adm.get("admission_date")
+        adm_end = adm.get("discharge_date")
+        if not adm_start:
+            continue
+        try:
+            result = client.upsert_admission({
+                "patient_mrn": mrn,
+                "admission_date": adm_start,
+                "discharge_date": adm_end,
+                "is_current": bool(adm.get("is_current")),
+                "associated_episodes": bool(adm.get("associated_episodes")),
+                "sync_run_id": run_id,
+            })
+            admission_id_map[(adm_start, adm_end)] = result["admission_id"]
+        except Exception as e:
+            logger.warning("Admission push failed for %s (%s): %s", mrn, adm, e)
 
     all_episodes = []
-    episode_id_map: dict[tuple[str, str | None], int] = {}
-    if soc_date and current_start and current_end:
-        all_episodes = compute_all_episodes(soc_date, current_start, current_end)
-        for ep in all_episodes:
-            try:
-                result = client.upsert_episode({
-                    "patient_mrn": mrn,
-                    "start_date": ep["start_date"],
-                    "end_date": ep["end_date"],
-                    "soc_date": soc_date,
-                    "physician_npi": npi,
-                    "sync_run_id": run_id,
-                })
-                episode_id_map[(ep["start_date"], ep["end_date"])] = result["episode_id"]
-            except Exception as e:
-                logger.warning("Episode push failed for %s (%s): %s", mrn, ep, e)
-    elif current_start and current_end:
+    episode_id_map: dict[tuple[str, str | None, str, str | None], int] = {}
+    all_episodes = compute_episodes_by_admissions(soc_date, admission_periods, current_end)
+    for ep in all_episodes:
+        admission_key = ep.get("admission_key") or (None, None)
+        admission_id = admission_id_map.get((admission_key[0], admission_key[1]))
         try:
             result = client.upsert_episode({
                 "patient_mrn": mrn,
-                "start_date": current_start,
-                "end_date": current_end,
+                "admission_id": admission_id,
+                "start_date": ep["start_date"],
+                "end_date": ep["end_date"],
                 "soc_date": soc_date,
                 "physician_npi": npi,
                 "sync_run_id": run_id,
             })
-            all_episodes = [{"start_date": current_start, "end_date": current_end}]
-            episode_id_map[(current_start, current_end)] = result["episode_id"]
+            episode_id_map[(
+                ep["start_date"],
+                ep["end_date"],
+                admission_key[0],
+                admission_key[1],
+            )] = result["episode_id"]
         except Exception as e:
-            logger.warning("Episode push failed for %s: %s", mrn, e)
+            logger.warning("Episode push failed for %s (%s): %s", mrn, ep, e)
 
     # -- Push schedule activities as orders --
     for activity in profile.get("schedule_activities", []):
@@ -213,7 +228,12 @@ def _push_patient_data(
             episode_id = None
             if episode_match:
                 episode_id = episode_id_map.get(
-                    (episode_match.get("start_date"), episode_match.get("end_date"))
+                    (
+                        episode_match.get("start_date"),
+                        episode_match.get("end_date"),
+                        (episode_match.get("admission_key") or (None, None))[0],
+                        (episode_match.get("admission_key") or (None, None))[1],
+                    )
                 )
 
             client.upsert_order({
@@ -254,28 +274,68 @@ def _push_patient_data(
 # Episode computation
 # -------------------------------------------------------------------
 
-def compute_all_episodes(
-    soc_date_str: str, current_start_str: str, current_end_str: str,
+def normalize_admission_periods(
+    admission_periods: list[dict] | None,
+    current_start_str: str | None,
+    current_end_str: str | None,
 ) -> list[dict]:
-    """Build every 60-day episode from Start of Care through current episode.
-
-    Each episode: start -> start + 59 days  (= 60 calendar days inclusive).
-    Next episode starts at previous end + 1 day.
-    """
-    soc = _iso_to_date(soc_date_str)
-    current_end = _iso_to_date(current_end_str)
-    if not soc or not current_end:
-        return []
-
-    episodes = []
-    ep_start = soc
-    while ep_start <= current_end:
-        ep_end = ep_start + timedelta(days=59)
-        episodes.append({
-            "start_date": ep_start.isoformat(),
-            "end_date": ep_end.isoformat(),
+    """Normalize admission periods and provide a fallback from chart episode dates."""
+    normalized: list[dict] = []
+    for adm in admission_periods or []:
+        start = adm.get("admission_date")
+        end = adm.get("discharge_date")
+        if not start:
+            continue
+        normalized.append({
+            "admission_date": start,
+            "discharge_date": end,
+            "is_current": bool(adm.get("is_current")),
+            "associated_episodes": bool(adm.get("associated_episodes")),
         })
-        ep_start = ep_end + timedelta(days=1)
+
+    if not normalized and current_start_str:
+        normalized.append({
+            "admission_date": current_start_str,
+            "discharge_date": current_end_str,
+            "is_current": True,
+            "associated_episodes": True,
+        })
+
+    normalized.sort(key=lambda a: a["admission_date"])
+    return normalized
+
+
+def compute_episodes_by_admissions(
+    soc_date_str: str | None,
+    admission_periods: list[dict],
+    fallback_end_str: str | None,
+) -> list[dict]:
+    """Build 60-day episodes inside each admission period."""
+    soc_date = _iso_to_date(soc_date_str)
+    fallback_end = _iso_to_date(fallback_end_str)
+    episodes: list[dict] = []
+
+    for adm in admission_periods:
+        start = _iso_to_date(adm.get("admission_date"))
+        if not start:
+            continue
+        end = _iso_to_date(adm.get("discharge_date")) or fallback_end or start
+        if end < start:
+            end = start
+
+        ep_start = start
+        if soc_date and start <= soc_date <= end:
+            ep_start = soc_date
+
+        while ep_start <= end:
+            ep_end = min(ep_start + timedelta(days=59), end)
+            episodes.append({
+                "start_date": ep_start.isoformat(),
+                "end_date": ep_end.isoformat(),
+                "admission_key": (adm.get("admission_date"), adm.get("discharge_date")),
+            })
+            ep_start = ep_end + timedelta(days=1)
+
     return episodes
 
 

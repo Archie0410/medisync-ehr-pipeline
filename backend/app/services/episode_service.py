@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.admission import Admission
 from app.models.patient import Patient
 from app.models.episode import Episode
 from app.models.physician import Physician
@@ -36,10 +37,16 @@ async def upsert_episode(db: AsyncSession, data: EpisodeUpsert) -> EpisodeUpsert
         physician = await _get_or_create_physician(db, data.physician_npi)
         physician_id = physician.id
 
+    admission_id = None
+    if data.admission_id is not None:
+        admission_id = await _resolve_admission(db, data.admission_id, patient.id)
+
     episode = await _find_episode(db, patient.id, data.start_date, data.end_date)
     action = "updated"
 
     if episode:
+        if admission_id is not None:
+            episode.admission_id = admission_id
         if data.soc_date is not None:
             episode.soc_date = data.soc_date
         if physician_id:
@@ -52,6 +59,7 @@ async def upsert_episode(db: AsyncSession, data: EpisodeUpsert) -> EpisodeUpsert
     else:
         episode = Episode(
             patient_id=patient.id,
+            admission_id=admission_id,
             start_date=data.start_date,
             end_date=data.end_date,
             soc_date=data.soc_date,
@@ -81,6 +89,18 @@ async def _find_episode(db: AsyncSession, patient_id: int, start_date, end_date)
 
     result = await db.execute(query)
     return result.scalar_one_or_none()
+
+
+async def _resolve_admission(db: AsyncSession, admission_id: int, patient_id: int) -> int:
+    result = await db.execute(select(Admission).where(Admission.id == admission_id))
+    admission = result.scalar_one_or_none()
+    if not admission:
+        raise ValueError(f"Admission id={admission_id} not found.")
+    if admission.patient_id != patient_id:
+        raise ValueError(
+            f"Admission id={admission_id} does not belong to patient_mrn in this episode payload."
+        )
+    return admission.id
 
 
 async def get_episodes_by_mrn(db: AsyncSession, mrn: str) -> list[Episode]:

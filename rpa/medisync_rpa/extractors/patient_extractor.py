@@ -160,6 +160,8 @@ def _open_and_extract_profile(driver: WebDriver) -> dict:
 
     _extract_chart_header(driver, data)
 
+    data["admission_periods"] = _extract_admission_periods(driver)
+
     try:
         profile_btn = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable(
@@ -264,55 +266,207 @@ def _extract_chart_header(driver: WebDriver, data: dict):
 
 
 # ===================================================================
+# Admission Periods extraction
+# ===================================================================
+
+def _extract_admission_periods(driver: WebDriver) -> list[dict]:
+    """Click 'View Admission Periods', scrape the table, close the dialog."""
+    periods: list[dict] = []
+
+    # Step 1: Click the "View Admission Periods" link on the chart header
+    try:
+        link = WebDriverWait(driver, 8).until(
+            EC.element_to_be_clickable(
+                (By.XPATH,
+                 "//span[contains(@class,'text-link') and contains(.,'View Admission Periods')]"
+                 " | //a[contains(.,'View Admission Periods')]"
+                 " | //*[contains(text(),'View Admission Periods')]")
+            )
+        )
+        driver.execute_script("arguments[0].scrollIntoView({block:'center'});", link)
+        time.sleep(0.5)
+        link.click()
+        time.sleep(3)
+    except Exception as e:
+        logger.info("View Admission Periods link not found or not clickable: %s", e)
+        return periods
+
+    # Step 2: Wait for the dialog / table to appear
+    try:
+        WebDriverWait(driver, 12).until(
+            lambda d: len(
+                d.find_elements(
+                    By.XPATH,
+                    "//*[contains(normalize-space(.), 'Patient Admission Periods')]"
+                    " | //div[starts-with(@id,'window_patientmanageddates') and contains(@class,'window')]"
+                    " | //div[starts-with(@id,'window_patientmanageddates_content')]",
+                )
+            ) > 0
+        )
+        time.sleep(1)
+    except Exception as e:
+        logger.warning("Admission Periods dialog did not appear: %s", e)
+        _close_admission_periods_dialog(driver)
+        return periods
+
+    # Step 3: Scrape rows from the table
+    try:
+        # Prefer rows from the specific Admission Periods window content container.
+        rows = driver.find_elements(
+            By.XPATH,
+            "//div[starts-with(@id,'window_patientmanageddates_content')]//table//tr[td]"
+        )
+        if not rows:
+            rows = driver.find_elements(
+                By.XPATH,
+                "//table[.//th[contains(normalize-space(.),'Admission Date')]]//tbody/tr"
+            )
+
+        for row in rows:
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) < 3:
+                continue
+            admission_raw = cells[0].text.strip()
+            discharge_raw = cells[1].text.strip()
+            current_raw = cells[2].text.strip() if len(cells) > 2 else ""
+            episodes_raw = cells[3].text.strip() if len(cells) > 3 else ""
+
+            periods.append({
+                "admission_date": _parse_date(admission_raw),
+                "discharge_date": _parse_date(discharge_raw) if discharge_raw else None,
+                "is_current": current_raw.strip().lower().startswith("yes"),
+                "associated_episodes": episodes_raw.strip().lower().startswith("yes"),
+            })
+        logger.info("Extracted %d admission periods", len(periods))
+    except Exception as e:
+        logger.warning("Failed to scrape admission periods table: %s", e)
+
+    # Step 4: Close the dialog
+    _close_admission_periods_dialog(driver)
+    return periods
+
+
+def _close_admission_periods_dialog(driver: WebDriver):
+    """Close the Admission Periods popup window."""
+    close_selectors = [
+        # Axxess window header close icon (from your screenshot)
+        (By.XPATH,
+         "//div[contains(@class,'window-top')]"
+         "[.//*[contains(normalize-space(.), 'Patient Admission Periods')]]"
+         "//span[contains(@class,'window-close')]"),
+        (By.XPATH, "//span[contains(@class,'window-close-span')]//span[contains(@class,'window-close')]"),
+        (By.XPATH, "//span[contains(@class,'window-close')]"),
+        (By.XPATH,
+         "//*[contains(text(),'Patient Admission Periods')]"
+         "/ancestor::div[1]//button[contains(@class,'close')]"),
+        (By.XPATH,
+         "//*[contains(text(),'Patient Admission Periods')]"
+         "/ancestor::div[contains(@class,'modal') or contains(@class,'window')]"
+         "//button[contains(@class,'close')]"),
+        (By.XPATH, "//button[contains(@class,'close') and @aria-label='Close']"),
+        (By.XPATH, "//button[normalize-space()='Close']"),
+        (By.LINK_TEXT, "Close"),
+    ]
+    for by, sel in close_selectors:
+        try:
+            btn = WebDriverWait(driver, 3).until(EC.element_to_be_clickable((by, sel)))
+            try:
+                btn.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", btn)
+            time.sleep(1)
+            logger.debug("Closed admission periods dialog via: %s='%s'", by, sel)
+            return
+        except Exception:
+            continue
+
+    try:
+        ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+        time.sleep(1)
+        logger.debug("Closed admission periods dialog via Escape key")
+    except Exception as e:
+        logger.warning("Could not close admission periods dialog: %s", e)
+
+
+# ===================================================================
 # Schedule Activity table extraction
 # ===================================================================
 
 def _change_date_filter_to_all(driver: WebDriver):
     """Change the Date dropdown above the Schedule Activity table to 'All'.
 
-    The Axxess UI uses a custom Vue ac-multiselect component, not a native
-    <select>.  We click the trigger to open the menu, then click the "All"
-    option span.
+    The Axxess UI has multiple ac-multiselect components on the Patient Charts
+    page (Branch, Show, Date, etc.). We must target the Schedule Activity Date
+    multiselect specifically — the one that displays "This Episode" before it
+    is changed — rather than the first multiselect in the DOM.
     """
-    # Step 1: Click the multiselect trigger to open the dropdown menu
+    trigger = None
     try:
         trigger = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, ".ac-multiselect__trigger, .ac-multiselect")
+                (
+                    By.XPATH,
+                    "//div[contains(@class, 'ac-multiselect')]"
+                    "[.//div[contains(@class, 'ac-multiselect__input') "
+                    "and normalize-space()='This Episode']]"
+                    "//div[contains(@class, 'ac-multiselect__input')]",
+                )
             )
         )
-        trigger.click()
-        time.sleep(1)
     except Exception:
-        # Fallback: try any element whose class contains "multiselect"
+        # Fallback: use the Date label if the selected value text is rendered
+        # differently for this patient/state.
         try:
-            trigger = driver.find_element(
-                By.XPATH,
-                "//*[contains(@class, 'ac-multiselect')]"
+            trigger = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable(
+                    (
+                        By.XPATH,
+                        "//label[normalize-space()='Date']"
+                        "/following-sibling::div[contains(@class, 'ac-multiselect')][1]"
+                        "//div[contains(@class, 'ac-multiselect__input')]"
+                        " | "
+                        "//span[normalize-space()='Date']"
+                        "/following::div[contains(@class, 'ac-multiselect')][1]"
+                        "//div[contains(@class, 'ac-multiselect__input')]",
+                    )
+                )
             )
-            trigger.click()
-            time.sleep(1)
         except Exception as e:
-            logger.warning("Could not open date filter dropdown: %s", e)
+            logger.warning("Could not locate the Date filter multiselect: %s", e)
             return
 
-    # Step 2: Click the "All" option inside the dropdown menu
+    try:
+        driver.execute_script(
+            "arguments[0].scrollIntoView({block: 'center'});", trigger
+        )
+        time.sleep(0.5)
+        trigger.click()
+        time.sleep(1)
+        logger.info("Opened Date filter dropdown")
+    except Exception as e:
+        logger.warning("Could not click Date filter dropdown: %s", e)
+        return
+
+    # Step 2: Click the "All" option inside the now-open dropdown menu
     try:
         all_option = WebDriverWait(driver, 5).until(
             EC.element_to_be_clickable(
-                (By.XPATH,
-                 "//span[contains(@class, 'ac-multiselect__option-text') "
-                 "and normalize-space()='All']")
+                (
+                    By.XPATH,
+                    "//div[contains(@class, 'ac-multiselect--active')]"
+                    "//span[contains(@class, 'ac-multiselect__option-text') "
+                    "and normalize-space()='All']",
+                )
             )
         )
         all_option.click()
         time.sleep(3)
         logger.info("Date filter changed to All")
     except Exception:
-        # Fallback: click any option div containing "All"
         try:
             all_div = driver.find_element(
                 By.XPATH,
+                "//div[contains(@class, 'ac-multiselect--active')]"
                 "//div[contains(@class, 'ac-multiselect__option')]"
                 "[.//span[normalize-space()='All']]"
             )
@@ -408,6 +562,9 @@ def _download_activity_document(
 
     download_btn = None
     btn_selectors = [
+        "a span.img.icon.print",
+        "a span.icon.print",
+        "a .print",
         "a.btn-primary",
         "button.btn-primary",
         "a[class*='btn']",
@@ -420,7 +577,12 @@ def _download_activity_document(
         for btn in found:
             if "post to" in (btn.text or "").lower():
                 continue
-            download_btn = btn
+            # If we matched an inner element (span inside <a>), click the parent <a>
+            try:
+                parent = btn.find_element(By.XPATH, "./ancestor::a")
+                download_btn = parent
+            except Exception:
+                download_btn = btn
             break
         if download_btn:
             break
@@ -827,6 +989,8 @@ def _empty_profile() -> dict:
         "allergies": None,
         # Episode
         "episode": None,
+        # Admission Periods
+        "admission_periods": [],
         # Clinical
         "case_manager": None,
         "clinical_manager": None,

@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base
-from app.api.routes import patients, episodes, orders, documents, sync, extractions
+from app.api.routes import admissions, patients, episodes, orders, documents, sync, extractions
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -35,6 +35,7 @@ app.add_middleware(
 )
 
 app.include_router(patients.router, prefix="/api/v1")
+app.include_router(admissions.router, prefix="/api/v1")
 app.include_router(episodes.router, prefix="/api/v1")
 app.include_router(orders.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")

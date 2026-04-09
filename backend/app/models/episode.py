@@ -15,6 +15,7 @@ class Episode(Base):
 
     id = Column(Integer, primary_key=True)
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
+    admission_id = Column(Integer, ForeignKey("admissions.id"), nullable=True, index=True)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date)
     soc_date = Column(Date)
@@ -30,5 +31,6 @@ class Episode(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     patient = relationship("Patient", back_populates="episodes")
+    admission = relationship("Admission", back_populates="episodes")
     physician = relationship("Physician")
     orders = relationship("Order", back_populates="episode", cascade="all, delete-orphan")

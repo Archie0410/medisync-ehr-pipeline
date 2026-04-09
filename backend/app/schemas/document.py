@@ -13,6 +13,7 @@ class DocumentResponse(BaseModel):
     order_id: int
     filename: str
     storage_type: str
+    pdf_order_id: str | None = None
     file_hash: str
     page_count: int | None
     created_at: datetime
@@ -25,6 +26,7 @@ class PatientDocumentResponse(BaseModel):
     order_id: str
     filename: str
     storage_type: str
+    pdf_order_id: str | None = None
     page_count: int | None
     doc_type: str | None
     status: str | None

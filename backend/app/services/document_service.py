@@ -2,8 +2,10 @@ import asyncio
 import hashlib
 import io
 import logging
+import re
 from pathlib import Path
 
+import fitz  # PyMuPDF
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +18,7 @@ logger = logging.getLogger("medisync.document_service")
 
 ORDER_LOOKUP_RETRIES = 3
 ORDER_LOOKUP_DELAY_S = 1.0
+PDF_ORDER_ID_PATTERN = re.compile(r"Order\s*#\s*:\s*([A-Za-z0-9\-]+)", re.IGNORECASE)
 
 
 async def upload_document(
@@ -46,6 +49,7 @@ async def upload_document(
         )
 
     file_hash = hashlib.sha256(file_bytes).hexdigest()
+    pdf_order_id = _extract_pdf_order_id(file_bytes)
 
     dup = await db.execute(
         select(Document).where(Document.order_id == order.id, Document.file_hash == file_hash)
@@ -62,6 +66,7 @@ async def upload_document(
         filename=filename,
         storage_type="local",
         storage_path=str(storage_path),
+        pdf_order_id=pdf_order_id,
         file_hash=file_hash,
         page_count=_count_pdf_pages(file_bytes),
     )
@@ -110,6 +115,40 @@ def _count_pdf_pages(data: bytes) -> int | None:
         return None
 
 
+def _extract_pdf_order_id(data: bytes) -> str | None:
+    text = _extract_pdf_text(data)
+    if not text:
+        return None
+
+    match = PDF_ORDER_ID_PATTERN.search(text)
+    if not match:
+        return None
+
+    return match.group(1).strip()
+
+
+def _extract_pdf_text(data: bytes) -> str:
+    try:
+        doc = fitz.open(stream=data, filetype="pdf")
+        try:
+            pages = [page.get_text() for page in doc]
+        finally:
+            doc.close()
+        text = "\n".join(pages).strip()
+        if text:
+            return text
+    except Exception:
+        pass
+
+    try:
+        import PyPDF2
+
+        reader = PyPDF2.PdfReader(io.BytesIO(data))
+        return "\n".join((page.extract_text() or "") for page in reader.pages).strip()
+    except Exception:
+        return ""
+
+
 async def get_documents_by_order(db: AsyncSession, order_ext_id: str) -> list[Document]:
     result = await db.execute(
         select(Document)
@@ -127,6 +166,7 @@ async def get_documents_by_mrn(db: AsyncSession, mrn: str) -> list[dict]:
             Order.order_id.label("order_id"),
             Document.filename.label("filename"),
             Document.storage_type.label("storage_type"),
+            Document.pdf_order_id.label("pdf_order_id"),
             Document.page_count.label("page_count"),
             Order.doc_type.label("doc_type"),
             Order.status.label("status"),

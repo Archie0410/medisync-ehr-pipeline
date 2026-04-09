@@ -19,7 +19,7 @@ class Order(Base):
     physician_id = Column(Integer, ForeignKey("physicians.id"), index=True)
     order_date = Column(Date, nullable=False)
     doc_type = Column(String(100))
-    status = Column(String(30), default="pending")
+    status = Column(String(100), default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

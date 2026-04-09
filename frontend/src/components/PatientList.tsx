@@ -14,12 +14,19 @@ export function PatientList({ patients, onSelect }: Props) {
     <div className="card-grid">
       {patients.map((patient) => (
         <button key={patient.mrn} className="card" onClick={() => onSelect(patient.mrn)}>
-          <div className="card-title">{patient.last_name}, {patient.first_name}</div>
-          <div className="card-sub">MRN: {patient.mrn}</div>
+          <div className="card-header-row">
+            <div>
+              <div className="card-title">{patient.last_name}, {patient.first_name}</div>
+              <div className="card-sub">MRN: {patient.mrn}</div>
+            </div>
+            <span className="badge-pill">
+              {patient.document_count ?? 0} docs
+            </span>
+          </div>
           <div className="card-meta">
             <span>{patient.episode_count ?? 0} episodes</span>
             <span>{patient.order_count ?? 0} orders</span>
-            <span>{patient.document_count ?? 0} docs</span>
+            <span>{patient.phone ?? "--"}</span>
           </div>
         </button>
       ))}

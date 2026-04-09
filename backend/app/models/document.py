@@ -14,6 +14,7 @@ class Document(Base):
     filename = Column(String(255), nullable=False)
     storage_type = Column(String(10), nullable=False, default="local")  # 'local' | 's3'
     storage_path = Column(String(500))
+    pdf_order_id = Column(String(50), index=True)
     file_hash = Column(String(64), nullable=False, index=True)
     page_count = Column(Integer)
     extracted_data = Column(JSON)

@@ -5,6 +5,7 @@ from datetime import date, datetime
 class EpisodeUpsert(BaseModel):
     """Upsert by (patient_mrn, start_date, end_date). Independent of /patients."""
     patient_mrn: str = Field(..., min_length=1)
+    admission_id: int | None = None
     start_date: date
     end_date: date | None = None
     soc_date: date | None = None
@@ -16,6 +17,7 @@ class EpisodeUpsert(BaseModel):
 class EpisodeResponse(BaseModel):
     id: int
     patient_id: int
+    admission_id: int | None
     start_date: date
     end_date: date | None
     soc_date: date | None

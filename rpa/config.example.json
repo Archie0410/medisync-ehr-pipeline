@@ -1,0 +1,20 @@
+{
+    "backend_url": "http://localhost:8000/api/v1",
+    "api_key": "dev-api-key-change-in-prod",
+    "rpa_name": "MediSync-RPA",
+    "max_patients": 5,
+    "axxess": {
+        "url": "https://accounts.axxessweb.com/Login",
+        "email": "your-email@example.com",
+        "password": "your-password-here",
+        "agency_name": "YOUR AGENCY NAME"
+    },
+    "chrome": {
+        "download_dir": "./downloads",
+        "headless": false
+    },
+    "retry": {
+        "max_attempts": 3,
+        "backoff_seconds": 5
+    }
+}
