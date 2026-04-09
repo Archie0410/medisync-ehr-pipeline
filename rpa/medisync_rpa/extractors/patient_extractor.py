@@ -804,6 +804,7 @@ def _parse_profile_text(text: str, data: dict):
         _rx(text, r"Medicare Part B Effective:\s*(\d{1,2}/\d{1,2}/\d{4})") or ""
     )
     data["mbi_number"] = _rx(text, r"MBI Number:\s*(\S+)")
+    data["existing_prior_episodes"] = _rx(text, r"Existing Prior Episodes\s*(.+?)(?=Secondary Insurance:|\n)", _normalize=True)
     sec_ins = _rx(text, r"Secondary Insurance:\s*(.+?)(?:Advanced Directive|\n)")
     data["secondary_insurance"] = None if sec_ins in ("N/A", "n/a") else sec_ins
     data["advanced_directive_comments"] = _rx(
@@ -812,12 +813,30 @@ def _parse_profile_text(text: str, data: dict):
 
     # --- Pharmacy & Allergies ---
     data["pharmacy_name"] = _rx(text, r"Primary:\s*(.+?)(?:Address:|Phone:|\n)", _normalize=True)
-    # NKDA / NKA has no label — plain text match
+
+    pharm_block = re.search(
+        r"Pharmacy\s+Allergies.*?Primary:\s*(.+?)(?=NKD?A\b|Current Episode)",
+        text, re.DOTALL | re.IGNORECASE,
+    )
+    if pharm_block:
+        pblock = pharm_block.group(1)
+        pa = re.search(r"Address:\s*(.+?)(?=Phone:|\n)", pblock, re.DOTALL | re.IGNORECASE)
+        if pa and pa.group(1).strip() not in ("N/A", "n/a", ""):
+            data["pharmacy_address"] = " ".join(pa.group(1).split())
+        pp = re.search(r"Phone:\s*(\(\d{3}\)\s*\d{3}[\-\s]\d{4})", pblock)
+        if pp:
+            data["pharmacy_phone"] = pp.group(1).strip()
+
     nkda = re.search(r"(NKD?A[^\n]*)", text, re.IGNORECASE)
     if nkda:
         data["allergies"] = nkda.group(1).strip()
     else:
         data["allergies"] = _rx(text, r"Allergies\s*(.+?)(?:Advanced Directives|\n)", _normalize=True)
+
+    # Advanced Directives type (e.g. "Surrogate Decision Maker")
+    adv_dir = re.search(r"(?:NKD?A|NKA)[^\n]*\n\s*(.+?)(?=\nCurrent Episode)", text, re.IGNORECASE)
+    if adv_dir and adv_dir.group(1).strip() not in ("N/A", "n/a", ""):
+        data["advanced_directives_type"] = adv_dir.group(1).strip()
 
     # --- Current Episode ---
     ep_match = re.search(
@@ -844,7 +863,7 @@ def _parse_profile_text(text: str, data: dict):
     data["services_required"] = _rx(text, r"Services Required:\s*(.+?)(?:Primary Clinician:|\n)", _normalize=True)
     data["primary_diagnosis"] = _rx(text, r"Primary Diagnosis:\s*(.+?)(?:Additional Diagnoses:|\n)", _normalize=True)
 
-    additional_raw = _rx(text, r"Additional Diagnoses:\s*(.+?)(?:Physician\(s\)|Attending:|\n)", _normalize=True)
+    additional_raw = _rx(text, r"Additional Diagnoses:\s*(.+?)(?=Physician\(s\)|Attending:)", _normalize=True)
     data["additional_diagnoses"] = additional_raw
 
     # --- Physicians ---
@@ -858,6 +877,7 @@ def _parse_profile_text(text: str, data: dict):
         npi = re.search(r"NPI:\s*(\d+)", block)
         if npi:
             data["attending_npi"] = npi.group(1)
+        _extract_physician_details(block, data, "attending")
 
     ref_block = re.search(
         r"Referring:\s*(.+?)(?:Certifying:|Contacts|$)", text, re.DOTALL | re.IGNORECASE
@@ -893,12 +913,36 @@ def _parse_profile_text(text: str, data: dict):
         ph = re.search(r"Phone:\s*(\(\d{3}\)\s*\d{3}[\-\s]\d{4})", block)
         data["emergency_contact_phone"] = ph.group(1).strip() if ph else None
 
+    # --- Legal Representative ---
+    legal_block = re.search(
+        r"Legal Representative\s*(.+?)(?=Secondary Emergency Contact:|$)",
+        text, re.DOTALL | re.IGNORECASE,
+    )
+    if legal_block:
+        lines = [l.strip() for l in legal_block.group(1).splitlines() if l.strip()]
+        joined = " ".join(lines)
+        if joined and joined not in ("N/A", "n/a"):
+            data["legal_representative"] = joined
+
+    # --- Secondary / Tertiary / CAHPS contacts ---
+    data["secondary_emergency_contact"] = _rx(
+        text, r"Secondary Emergency Contact:\s*(.+?)(?=Tertiary Emergency Contact:|\n)", _normalize=True,
+    )
+    data["tertiary_emergency_contact"] = _rx(
+        text, r"Tertiary Emergency Contact:\s*(.+?)(?=CAHPS Contact:|\n)", _normalize=True,
+    )
+    data["cahps_contact"] = _rx(
+        text, r"CAHPS Contact:\s*(.+?)(?=Referral Information|\n)", _normalize=True,
+    )
+
     # --- Referral info (page 2) ---
     data["referral_date"] = _parse_date(
         _rx(text, r"Referral Date:\s*(\d{1,2}/\d{1,2}/\d{4})") or ""
     )
     data["admission_source"] = _rx(text, r"Admission Source:\s*(.+?)(?:Name of Referral Source:|\n)", _normalize=True)
+    data["name_of_referral_source"] = _rx(text, r"Name of Referral Source:\s*(.+?)(?=Community Liaison:|\n)", _normalize=True)
     data["community_liaison"] = _rx(text, r"Community Liaison:\s*(.+?)(?:Internal Referral Source:|\n)", _normalize=True)
+    data["internal_referral_source"] = _rx(text, r"Internal Referral Source:\s*(.+?)(?=Facility Referral Source:|\n)", _normalize=True)
     data["facility_referral_source"] = _rx(text, r"Facility Referral Source:\s*(.+?)(?:Face-to-Face|\n)", _normalize=True)
     data["face_to_face_date"] = _parse_date(
         _rx(text, r"Face-to-Face Eval Info:\s*(\d{1,2}/\d{1,2}/\d{4})") or ""
@@ -906,6 +950,20 @@ def _parse_profile_text(text: str, data: dict):
     data["priority_visit_type"] = _rx(text, r"Priority \(Type of Visit\):\s*(.+?)(?:Emergency Triage|\n)", _normalize=True)
     triage = re.search(r"Emergency Triage Level:\s*(\d+)\.", text, re.IGNORECASE)
     data["emergency_triage_level"] = int(triage.group(1)) if triage else None
+    triage_desc = re.search(
+        r"Emergency Triage Level:\s*\d+\.\s*(.+?)(?=Additional Emergency|$)",
+        text, re.DOTALL | re.IGNORECASE,
+    )
+    if triage_desc:
+        data["emergency_triage_description"] = " ".join(triage_desc.group(1).split())
+
+    # --- Emergency Preparedness ---
+    data["emergency_preparedness"] = _rx(
+        text, r"Additional Emergency Preparedness Information:\s*(.+?)(?=Equipment Needs:)", _normalize=True,
+    )
+    data["equipment_needs"] = _rx(
+        text, r"Equipment Needs:\s*(.+?)(?=INTERIM HEALTHCARE|PATIENT PROFILE|\n)", _normalize=True,
+    )
 
     # --- Patient name (from footer line after "PATIENT PROFILE") ---
     name_match = re.search(r"PATIENT PROFILE\s*\n\s*(.+?)(?:\n|$)", text)
@@ -916,6 +974,30 @@ def _parse_profile_text(text: str, data: dict):
             data["last_name"] = parts[0].strip()
             first_parts = parts[1].strip().split()
             data["first_name"] = first_parts[0].rstrip(".") if first_parts else ""
+
+
+# ===================================================================
+# Physician detail helpers
+# ===================================================================
+
+def _extract_physician_details(block: str, data: dict, prefix: str):
+    """Extract address, phone, fax, and careplan oversight from a physician block."""
+    addr = re.search(r"Address:\s*(.+?)(?=Phone:|Fax:)", block, re.DOTALL | re.IGNORECASE)
+    if addr:
+        val = " ".join(addr.group(1).split())
+        if val and val not in ("N/A", "n/a"):
+            data[f"{prefix}_address"] = val
+
+    phone = re.search(r"Phone:\s*(\(\d{3}\)\s*\d{3}[\-\s]\d{4})", block)
+    if phone:
+        data[f"{prefix}_phone"] = phone.group(1).strip()
+
+    fax = re.search(r"Fax:\s*(\(\d{3}\)\s*\d{3}[\-\s]\d{4})", block)
+    if fax:
+        data[f"{prefix}_fax"] = fax.group(1).strip()
+
+    if prefix == "attending" and "careplan oversight" in block.lower():
+        data["careplan_oversight"] = True
 
 
 # ===================================================================
@@ -982,11 +1064,15 @@ def _empty_profile() -> dict:
         "medicare_part_a_effective": None,
         "medicare_part_b_effective": None,
         "mbi_number": None,
+        "existing_prior_episodes": None,
         "secondary_insurance": None,
         "advanced_directive_comments": None,
-        # Pharmacy / Allergies
+        # Pharmacy / Allergies / Directives
         "pharmacy_name": None,
+        "pharmacy_address": None,
+        "pharmacy_phone": None,
         "allergies": None,
+        "advanced_directives_type": None,
         # Episode
         "episode": None,
         # Admission Periods
@@ -1001,6 +1087,10 @@ def _empty_profile() -> dict:
         # Physicians
         "attending_physician": None,
         "attending_npi": None,
+        "attending_address": None,
+        "attending_phone": None,
+        "attending_fax": None,
+        "careplan_oversight": None,
         "referring_physician": None,
         "referring_npi": None,
         "certifying_physician": None,
@@ -1009,14 +1099,24 @@ def _empty_profile() -> dict:
         "emergency_contact_name": None,
         "emergency_contact_relationship": None,
         "emergency_contact_phone": None,
+        "legal_representative": None,
+        "secondary_emergency_contact": None,
+        "tertiary_emergency_contact": None,
+        "cahps_contact": None,
         # Referral info (page 2)
         "referral_date": None,
         "admission_source": None,
+        "name_of_referral_source": None,
         "community_liaison": None,
+        "internal_referral_source": None,
         "facility_referral_source": None,
         "face_to_face_date": None,
         "priority_visit_type": None,
         "emergency_triage_level": None,
+        "emergency_triage_description": None,
+        # Emergency Preparedness
+        "emergency_preparedness": None,
+        "equipment_needs": None,
         # Internal
         "sidebar_name": "",
         "schedule_activities": [],

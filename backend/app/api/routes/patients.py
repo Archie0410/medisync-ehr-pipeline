@@ -10,6 +10,7 @@ from app.schemas.patient import (
     PatientOverviewResponse,
 )
 from app.services import patient_service
+from app.services.npi_service import sync_all_patient_npis
 
 router = APIRouter(prefix="/patients", tags=["patients"], dependencies=[Depends(verify_api_key)])
 
@@ -25,6 +26,12 @@ async def list_patients_overview(
     limit: int = 50, offset: int = 0, db: AsyncSession = Depends(get_db)
 ):
     return await patient_service.list_patients_overview(db, limit=limit, offset=offset)
+
+
+@router.post("/sync-npi")
+async def sync_npi_all(db: AsyncSession = Depends(get_db)):
+    """Look up all unique NPIs across every patient via the NPPES registry and enrich."""
+    return await sync_all_patient_npis(db)
 
 
 @router.get("/{mrn}", response_model=PatientResponse)

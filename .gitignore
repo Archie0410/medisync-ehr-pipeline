@@ -19,6 +19,8 @@ backend/storage/documents/*
 !backend/storage/documents/.gitkeep
 backend/storage/extractions/*
 !backend/storage/extractions/.gitkeep
+storage/documents/*
+!storage/documents/.gitkeep
 rpa/downloads/*
 !rpa/downloads/.gitkeep
 rpa/config.json

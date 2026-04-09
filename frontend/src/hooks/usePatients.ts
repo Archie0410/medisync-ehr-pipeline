@@ -6,6 +6,7 @@ export function usePatients() {
   const [patients, setPatients] = useState<PatientOverview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -33,9 +34,11 @@ export function usePatients() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [tick]);
 
-  return { patients, loading, error };
+  const refetch = () => setTick((t) => t + 1);
+
+  return { patients, loading, error, refetch };
 }
 
 export function usePatientContext(mrn?: string) {
@@ -45,6 +48,7 @@ export function usePatientContext(mrn?: string) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const targetMrn = mrn;
@@ -87,7 +91,9 @@ export function usePatientContext(mrn?: string) {
     return () => {
       mounted = false;
     };
-  }, [mrn]);
+  }, [mrn, tick]);
 
-  return { patient, episodes, orders, documents, loading, error };
+  const refetch = () => setTick((t) => t + 1);
+
+  return { patient, episodes, orders, documents, loading, error, refetch };
 }

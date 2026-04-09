@@ -125,22 +125,32 @@ def _push_patient_data(
             "primary_address", "mailing_address", "email",
             # Payer
             "primary_insurance", "medicare_part_a_effective", "medicare_part_b_effective",
-            "mbi_number", "secondary_insurance", "advanced_directive_comments",
-            # Pharmacy / Allergies
-            "pharmacy_name", "allergies",
+            "mbi_number", "existing_prior_episodes",
+            "secondary_insurance", "advanced_directive_comments",
+            # Pharmacy / Allergies / Directives
+            "pharmacy_name", "pharmacy_address", "pharmacy_phone",
+            "allergies", "advanced_directives_type",
             # Clinical
             "case_manager", "clinical_manager", "primary_clinician",
             "services_required", "primary_diagnosis", "additional_diagnoses",
             # Physicians
             "attending_physician", "attending_npi",
+            "attending_address", "attending_phone", "attending_fax",
+            "careplan_oversight",
             "referring_physician", "referring_npi",
             "certifying_physician", "certifying_npi",
-            # Emergency contact
+            # Emergency contacts
             "emergency_contact_name", "emergency_contact_relationship", "emergency_contact_phone",
+            "legal_representative",
+            "secondary_emergency_contact", "tertiary_emergency_contact",
+            "cahps_contact",
             # Referral
-            "referral_date", "admission_source", "community_liaison",
+            "referral_date", "admission_source", "name_of_referral_source",
+            "community_liaison", "internal_referral_source",
             "facility_referral_source", "face_to_face_date",
-            "priority_visit_type", "emergency_triage_level",
+            "priority_visit_type", "emergency_triage_level", "emergency_triage_description",
+            # Emergency Preparedness
+            "emergency_preparedness", "equipment_needs",
             # Admission Periods
             "admission_periods",
         ]
